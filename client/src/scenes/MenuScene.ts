@@ -16,7 +16,7 @@ const MODES = [
 ];
 
 const PLAYER_MODES = [
-  { id: "solo", name: "Sozinho", desc: "Você contra os guardas, sem outros jogadores (sempre modo Assalto)" },
+  { id: "solo", name: "Singleplayer", desc: "Você contra os guardas, sem outros jogadores (sempre modo Assalto)" },
   { id: "publica", name: "Multiplayer — Sala Aberta", desc: "Entra numa partida pública — qualquer um pode completar" },
   { id: "privada", name: "Multiplayer — Sala Privada", desc: "Só quem tiver o código entra — até 4 jogadores" },
 ];
@@ -360,7 +360,7 @@ export class MenuScene extends Phaser.Scene {
     this.modeCards.push({ id: mode.id, bg });
   }
 
-  /** Current allowed [min,max] for a vault stepper — wider once "Sozinho" is selected. */
+  /** Current allowed [min,max] for a vault stepper — wider once "Singleplayer" is selected. */
   private stepperRange(key: "fakeCount" | "trackerCount"): { min: number; max: number } {
     const table = this.playerMode === "solo" ? SOLO_COUNT_RANGE : MULTI_COUNT_RANGE;
     return key === "fakeCount" ? table.fake : table.tracker;
@@ -504,13 +504,13 @@ export class MenuScene extends Phaser.Scene {
     });
     saveProfile(this.profile);
     this.vaultHintText?.setText(
-      this.playerMode === "solo" ? "(sozinho: rastreador pode ser 0, até 9 de cada)" : ""
+      this.playerMode === "solo" ? "(singleplayer: rastreador pode ser 0, até 9 de cada)" : ""
     );
 
     const isPrivate = this.playerMode === "privada";
     this.startBtn?.setVisible(!isPrivate);
     this.startBtnLabel?.setVisible(!isPrivate);
-    this.startBtnLabel?.setText(this.playerMode === "solo" ? "JOGAR SOZINHO" : "ENTRAR NO MUSEU");
+    this.startBtnLabel?.setText(this.playerMode === "solo" ? "JOGAR SINGLEPLAYER" : "ENTRAR NO MUSEU");
     this.createPrivateBtn?.setVisible(isPrivate);
     this.joinPrivateBtn?.setVisible(isPrivate);
   }

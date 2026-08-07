@@ -256,7 +256,13 @@ export class HeistRoom extends Room<HeistState> {
   private statues: { x: number; y: number }[] = [];
   private obraSecrets = new Map<string, ObraSecret>();
 
-  onCreate(options: { mode?: string; fakeCount?: number; trackerCount?: number }) {
+  onCreate(options: {
+    mode?: string;
+    fakeCount?: number;
+    trackerCount?: number;
+    solo?: boolean;
+    private?: boolean;
+  }) {
     this.setState(new HeistState());
     this.state.startedAt = Date.now();
 
@@ -265,6 +271,11 @@ export class HeistRoom extends Room<HeistState> {
     }
     this.state.mode = this.mode;
     this.maxClients = this.mode === "seguranca" ? 5 : 4;
+    // Solo play has to actually be capped at 1 seat — without this, "Sozinho"
+    // just joined the same public matchmaking pool as everyone else and any
+    // stranger could land in what looked like a private run.
+    if (options?.solo) this.maxClients = 1;
+    if (options?.private || options?.solo) this.setPrivate(true);
     this.specialSlot = 1 + Math.floor(Math.random() * this.maxClients);
 
     this.setupMaze();

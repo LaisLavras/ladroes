@@ -1,11 +1,10 @@
 import Phaser from "phaser";
 import { getStateCallbacks, type Room } from "colyseus.js";
-import { joinHeistRoom } from "../network/room";
+import { joinHeistRoom, createPrivateRoom, joinPrivateRoomByCode } from "../network/room";
 import { loadProfile, saveProfile } from "../economy";
 import { createPersonContainer } from "../pixelPerson";
 import { createObraIcon } from "../obraIcons";
 import { startSuspenseMusic, stopSuspenseMusic, setGuardChaseActive, setDoorOpening } from "../audio";
-import { createFloorTexture } from "../floorTexture";
 
 function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v));
@@ -109,6 +108,8 @@ interface HeistSceneData {
   mode?: string;
   fakeCount?: number;
   trackerCount?: number;
+  connectMode?: "solo" | "publica" | "privadaCriar" | "privadaEntrar";
+  privateCode?: string;
 }
 
 export class HeistScene extends Phaser.Scene {
@@ -117,6 +118,8 @@ export class HeistScene extends Phaser.Scene {
   private mode: string = "assalto";
   private fakeCount: number = 1;
   private trackerCount: number = 1;
+  private connectMode: "solo" | "publica" | "privadaCriar" | "privadaEntrar" = "publica";
+  private privateCode?: string;
   private room?: Room;
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd?: Record<"W" | "A" | "S" | "D", Phaser.Input.Keyboard.Key>;
@@ -140,6 +143,7 @@ export class HeistScene extends Phaser.Scene {
   private alarmBarFill?: Phaser.GameObjects.Rectangle;
   private alarmLabel?: Phaser.GameObjects.Text;
   private timerText?: Phaser.GameObjects.Text;
+  private abilityCooldownText?: Phaser.GameObjects.Text;
   private toastText?: Phaser.GameObjects.Text;
   private toastHideEvent?: Phaser.Time.TimerEvent;
   private backToShopBtn?: Phaser.GameObjects.Text;
@@ -157,6 +161,8 @@ export class HeistScene extends Phaser.Scene {
     this.mode = data?.mode ?? "assalto";
     this.fakeCount = data?.fakeCount ?? 1;
     this.trackerCount = data?.trackerCount ?? 1;
+    this.connectMode = data?.connectMode ?? "publica";
+    this.privateCode = data?.privateCode;
 
     // Phaser reuses this Scene instance across restarts (init/create run
     // again, but the constructor doesn't) — without clearing these here, a
@@ -240,6 +246,18 @@ export class HeistScene extends Phaser.Scene {
         fontFamily: "monospace",
         fontSize: "22px",
         color: "#f2e94e",
+      })
+      .setOrigin(0.5, 0)
+      .setDepth(10)
+      .setScrollFactor(0);
+
+    // Only shown for roles with an ability on cooldown (Fantasma, Engenheiro,
+    // Chefe) — counts down to when it's usable again.
+    this.abilityCooldownText = this.add
+      .text(HUD_PANEL.x + HUD_PANEL.w / 2, HUD_PANEL.y + 122, "", {
+        fontFamily: "monospace",
+        fontSize: "12px",
+        color: "#f2a641",
       })
       .setOrigin(0.5, 0)
       .setDepth(10)
@@ -375,11 +393,8 @@ export class HeistScene extends Phaser.Scene {
   }
 
   private drawFloor() {
-    const floorKey = createFloorTexture(this);
-    this.add.tileSprite(0, 0, BOUNDS.width, BOUNDS.height, floorKey).setOrigin(0, 0).setDepth(-1);
-
     const g = this.add.graphics();
-    g.lineStyle(1, 0x1c2733, 0.35);
+    g.lineStyle(1, 0x1c2733, 1);
     for (let x = 0; x <= BOUNDS.width; x += 32) g.lineBetween(x, 0, x, BOUNDS.height);
     for (let y = 0; y <= BOUNDS.height; y += 32) g.lineBetween(0, y, BOUNDS.width, y);
     g.lineStyle(2, 0xf2a641, 1);
@@ -419,13 +434,30 @@ export class HeistScene extends Phaser.Scene {
 
   private async connect() {
     try {
-      this.room = await joinHeistRoom({
+      const options = {
         name: this.playerName,
         loadout: this.loadout,
         mode: this.mode,
         fakeCount: this.fakeCount,
         trackerCount: this.trackerCount,
-      });
+      };
+
+      // These used to all fall through to the same public matchmake call
+      // regardless of what was picked in the menu — "Sozinho" and "Sala
+      // Privada" looked wired up in the UI but never actually kept anyone
+      // else out. Solo forces maxClients to 1 server-side (see HeistRoom),
+      // and private rooms are unlisted so they only show up via their code.
+      if (this.connectMode === "solo") {
+        this.room = await createPrivateRoom({ ...options, solo: true });
+      } else if (this.connectMode === "privadaCriar") {
+        this.room = await createPrivateRoom(options);
+      } else if (this.connectMode === "privadaEntrar") {
+        if (!this.privateCode) throw new Error("Código da sala privada não informado.");
+        this.room = await joinPrivateRoomByCode(this.privateCode, options);
+      } else {
+        this.room = await joinHeistRoom(options);
+      }
+
       this.statusText?.setText(`Conectado — sala ${this.room.roomId}`);
       this.showToast("💡 Segure E perto de uma porta trancada para abrir", 6000);
       startSuspenseMusic();
@@ -731,6 +763,16 @@ export class HeistScene extends Phaser.Scene {
     // the instant it ends, instead of drifting past the actual finish time.
     if (state.gameStatus === "playing" && typeof state.startedAt === "number" && state.startedAt > 0) {
       this.timerText?.setText(`⏱ ${formatTime(Date.now() - state.startedAt)}`);
+    }
+
+    // Fantasma/Engenheiro/Chefe all have a timed ability — this counts down
+    // to when it's usable again instead of leaving it a guessing game.
+    const me = state.players?.get(this.room.sessionId);
+    const remainingMs = me ? me.abilityCooldownUntil - Date.now() : 0;
+    if (me && ["fantasma", "engenheiro", "chefe"].includes(me.role) && remainingMs > 0) {
+      this.abilityCooldownText?.setText(`🕐 Habilidade em ${Math.ceil(remainingMs / 1000)}s`).setVisible(true);
+    } else {
+      this.abilityCooldownText?.setVisible(false);
     }
 
     const timeSuffix = typeof this.finishTimeMs === "number" ? `\n⏱ ${formatTime(this.finishTimeMs)}` : "";
