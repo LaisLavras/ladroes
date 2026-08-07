@@ -18,10 +18,10 @@ export default config({
       res.send("Servidor de Ladroes de Museu no ar.");
     });
 
-    app.get("/leaderboard", (req, res) => {
+    app.get("/leaderboard", async (req, res) => {
       const mode = typeof req.query.mode === "string" ? req.query.mode : undefined;
       const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 10));
-      res.json(getTopScores(mode, limit));
+      res.json(await getTopScores(mode, limit));
     });
   },
 });

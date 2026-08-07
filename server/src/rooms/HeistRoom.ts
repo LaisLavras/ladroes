@@ -595,6 +595,7 @@ export class HeistRoom extends Room<HeistState> {
     // being filled by a hacker this tick snaps its progress back to 0, so
     // letting go of the button always means starting over from scratch.
     const doorsBeingOpened = new Set<string>();
+    let sabotageActive = false;
 
     for (const [sessionId, player] of this.state.players.entries()) {
       const input = this.inputs.get(sessionId);
@@ -655,6 +656,7 @@ export class HeistRoom extends Room<HeistState> {
             door.progress = Math.max(0, door.progress - DOOR_FILL_RATE * dt);
             if (door.progress <= 0) door.open = false;
             this.state.alarm = Math.min(100, this.state.alarm + TRAITOR_SABOTAGE_ALARM_RATE * dt);
+            sabotageActive = true;
             break;
           }
         }
@@ -748,17 +750,22 @@ export class HeistRoom extends Room<HeistState> {
       }
     }
 
-    this.updateGuards(dt, now);
+    this.updateGuards(dt, now, sabotageActive);
   }
 
-  /** Logs one leaderboard entry per given player, all sharing the run's finish time. */
+  /** Logs one leaderboard entry per given player, all sharing the run's finish time.
+   * Fire-and-forget from tick() (which can't await), but the writes inside
+   * still happen one at a time — running them concurrently would race on
+   * Firestore's read-modify-write and could silently drop an entry. */
   private recordCompletion(sessionIds: string[], timeMs: number) {
     const date = new Date().toISOString();
-    for (const sessionId of sessionIds) {
-      const player = this.state.players.get(sessionId);
-      if (!player) continue;
-      addScore({ name: player.name, timeMs, mode: this.mode, date });
-    }
+    (async () => {
+      for (const sessionId of sessionIds) {
+        const player = this.state.players.get(sessionId);
+        if (!player) continue;
+        await addScore({ name: player.name, timeMs, mode: this.mode, date });
+      }
+    })().catch((err) => console.error("[HeistRoom] failed to record completion:", err));
   }
 
   /** Nearest non-invisible, non-hidden thief within capture range of the chief. */
@@ -773,7 +780,7 @@ export class HeistRoom extends Room<HeistState> {
     return null;
   }
 
-  private updateGuards(dt: number, now: number) {
+  private updateGuards(dt: number, now: number, sabotageActive: boolean) {
     const guardsActive = now >= this.guardsDisabledUntil;
     let anyDetected = false;
     let bestRiseRate = 0;
@@ -876,7 +883,11 @@ export class HeistRoom extends Room<HeistState> {
 
     if (anyDetected) {
       this.state.alarm = Math.min(100, this.state.alarm + bestRiseRate * dt);
-    } else {
+    } else if (!sabotageActive) {
+      // Sabotage already bumped the alarm up this tick (above, in the main
+      // player loop) — decaying it again right after would cancel that out
+      // every single tick, so the alarm would never actually rise from
+      // sabotaging with no guard watching.
       this.state.alarm = Math.max(0, this.state.alarm - ALARM_DECAY_RATE * dt);
     }
 

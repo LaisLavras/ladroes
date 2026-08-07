@@ -3,3 +3,5 @@ dist
 *.log
 .env
 leaderboard.json
+*firebase*.json
+serviceAccountKey.json

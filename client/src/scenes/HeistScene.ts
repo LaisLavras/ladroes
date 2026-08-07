@@ -144,6 +144,7 @@ export class HeistScene extends Phaser.Scene {
   private alarmLabel?: Phaser.GameObjects.Text;
   private timerText?: Phaser.GameObjects.Text;
   private abilityCooldownText?: Phaser.GameObjects.Text;
+  private privateCodeText?: Phaser.GameObjects.Text;
   private toastText?: Phaser.GameObjects.Text;
   private toastHideEvent?: Phaser.Time.TimerEvent;
   private backToShopBtn?: Phaser.GameObjects.Text;
@@ -212,6 +213,23 @@ export class HeistScene extends Phaser.Scene {
       .text(16, 40, "", { fontFamily: "monospace", fontSize: "13px", color: "#f2a641" })
       .setDepth(10)
       .setScrollFactor(0);
+
+    // Only shown right after creating a private room — stays up (not a
+    // timed toast) until a friend actually joins, since a code that
+    // flashes for a few seconds and vanishes is easy to miss entirely.
+    this.privateCodeText = this.add
+      .text(VIEWPORT.width / 2, 16, "", {
+        fontFamily: "monospace",
+        fontSize: "18px",
+        color: "#0b0f14",
+        backgroundColor: "#49c2b1",
+        padding: { x: 14, y: 8 },
+        align: "center",
+      })
+      .setOrigin(0.5, 0)
+      .setDepth(20)
+      .setScrollFactor(0)
+      .setVisible(false);
 
     this.add
       .rectangle(HUD_PANEL.x, HUD_PANEL.y, HUD_PANEL.w, HUD_PANEL.h, 0x0f151d, 0.92)
@@ -462,6 +480,10 @@ export class HeistScene extends Phaser.Scene {
       this.showToast("💡 Segure E perto de uma porta trancada para abrir", 6000);
       startSuspenseMusic();
 
+      if (this.connectMode === "privadaCriar") {
+        this.privateCodeText?.setText(`CÓDIGO DA SALA: ${this.room.roomId}\npasse esse código para seus amigos`).setVisible(true);
+      }
+
       const $ = getStateCallbacks(this.room);
 
       // The maze layout is randomized per room instance on the server, so the
@@ -496,6 +518,9 @@ export class HeistScene extends Phaser.Scene {
       $(this.room.state).players.onAdd((player, sessionId: string) => {
         const isSelf = sessionId === this.room?.sessionId;
         const color = ROLE_COLOR[player.role] ?? 0xffffff;
+
+        // A friend actually joined — the code banner has done its job.
+        if (!isSelf) this.privateCodeText?.setVisible(false);
 
         const ringColor = isSelf ? 0xffffff : 0x000000;
         const ringAlpha = isSelf ? 0.5 : 0.25;
@@ -704,6 +729,22 @@ export class HeistScene extends Phaser.Scene {
         gfx.fillRect(door.x, door.y, door.w, door.h);
         gfx.lineStyle(2, 0xffe14d, 0.9);
         gfx.strokeRect(door.x, door.y, door.w, door.h);
+
+        // Being sabotaged by the traitor — an open door used to look
+        // completely static while this was happening, so nothing on
+        // screen showed the ~9s of holding R was doing anything at all.
+        // This red bar creeps in from one side as it gets closer to
+        // slamming shut, and also feeds the creak sound below.
+        const closingPct = 1 - Math.min(1, (door.progress ?? 100) / 100);
+        if (closingPct > 0) {
+          gfx.fillStyle(0xe5484d, 0.85);
+          if (door.h > door.w) {
+            gfx.fillRect(door.x - 2, door.y, door.w + 4, door.h * closingPct);
+          } else {
+            gfx.fillRect(door.x + door.w * (1 - closingPct), door.y - 2, door.w * closingPct, door.h + 4);
+          }
+          doorOpeningProgress = Math.max(doorOpeningProgress, closingPct);
+        }
       }
     });
     setDoorOpening(doorOpeningProgress >= 0, Math.max(0, doorOpeningProgress));

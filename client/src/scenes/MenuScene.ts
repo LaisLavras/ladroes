@@ -510,7 +510,7 @@ export class MenuScene extends Phaser.Scene {
     const isPrivate = this.playerMode === "privada";
     this.startBtn?.setVisible(!isPrivate);
     this.startBtnLabel?.setVisible(!isPrivate);
-    this.startBtnLabel?.setText(this.playerMode === "solo" ? "JOGAR SINGLEPLAYER" : "ENTRAR NO MUSEU");
+    this.startBtnLabel?.setText("JOGAR");
     this.createPrivateBtn?.setVisible(isPrivate);
     this.joinPrivateBtn?.setVisible(isPrivate);
   }
