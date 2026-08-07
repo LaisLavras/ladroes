@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: museu-server
+    runtime: node
+    rootDir: server
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 20
