@@ -540,7 +540,11 @@ export class HeistScene extends Phaser.Scene {
   }
 
   update() {
-    if (!this.room) return;
+    // The initial state patch can arrive a frame or two after the join
+    // promise resolves — over real network latency (unlike localhost) this
+    // gap is reliably wide enough for update() to run before it, so every
+    // state read below has to tolerate `state.players` not existing yet.
+    if (!this.room || !(this.room.state as any)?.players) return;
 
     let x = 0;
     let y = 0;
