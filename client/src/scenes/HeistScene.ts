@@ -5,6 +5,7 @@ import { loadProfile, saveProfile } from "../economy";
 import { createPersonContainer } from "../pixelPerson";
 import { createObraIcon } from "../obraIcons";
 import { startSuspenseMusic, stopSuspenseMusic, setGuardChaseActive, setDoorOpening } from "../audio";
+import { createFloorTexture } from "../floorTexture";
 
 function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v));
@@ -374,8 +375,11 @@ export class HeistScene extends Phaser.Scene {
   }
 
   private drawFloor() {
+    const floorKey = createFloorTexture(this);
+    this.add.tileSprite(0, 0, BOUNDS.width, BOUNDS.height, floorKey).setOrigin(0, 0).setDepth(-1);
+
     const g = this.add.graphics();
-    g.lineStyle(1, 0x1c2733, 1);
+    g.lineStyle(1, 0x1c2733, 0.35);
     for (let x = 0; x <= BOUNDS.width; x += 32) g.lineBetween(x, 0, x, BOUNDS.height);
     for (let y = 0; y <= BOUNDS.height; y += 32) g.lineBetween(0, y, BOUNDS.width, y);
     g.lineStyle(2, 0xf2a641, 1);
