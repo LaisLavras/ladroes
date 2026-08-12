@@ -18,6 +18,18 @@
       "runtimeExecutable": "/bin/bash",
       "runtimeArgs": ["-c", "cd /Users/laislavras/Desktop/baixoumais/apps/mobile && exec npx expo start --web --port 8081"],
       "port": 8081
+    },
+    {
+      "name": "museu-server",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": ["-c", "cd /Users/laislavras/Desktop/Museu/server && exec npm run dev"],
+      "port": 2567
+    },
+    {
+      "name": "museu-client",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": ["-c", "cd /Users/laislavras/Desktop/Museu/client && exec npm run dev"],
+      "port": 5173
     }
   ]
 }

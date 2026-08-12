@@ -259,6 +259,21 @@ export class MenuScene extends Phaser.Scene {
       this.startGame(this.playerMode === "solo" ? "solo" : "publica");
     });
 
+    // Tucked in the corner, low-contrast — not meant to be noticed during
+    // play, just there so it's possible to confirm which build is actually
+    // live on the deployed site (compare against the latest commit locally).
+    const buildDate = new Date(__BUILD_TIME__);
+    const buildStamp = Number.isNaN(buildDate.getTime())
+      ? __BUILD_COMMIT__
+      : `${__BUILD_COMMIT__} — ${buildDate.toLocaleDateString("pt-BR")} ${buildDate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
+    this.add
+      .text(WIDTH - 6, HEIGHT - 4, buildStamp, {
+        fontFamily: "monospace",
+        fontSize: "9px",
+        color: "#3a4552",
+      })
+      .setOrigin(1, 1);
+
     this.refresh();
   }
 

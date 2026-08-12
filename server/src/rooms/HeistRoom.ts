@@ -24,7 +24,13 @@ const ROOM_SIZE = 620;
 const BOUNDS = { width: COLS * ROOM_SIZE, height: ROWS * ROOM_SIZE };
 
 const ENTRANCE_CELL = { col: 0, row: 0 };
-const VAULT_CELL = { col: COLS - 1, row: ROWS - 1 };
+// The vault always sits exactly this many rooms from the entrance (by the
+// only path that reaches it) — a run's minimum possible distance is the same
+// every match, so times on the leaderboard are actually comparable to each
+// other instead of depending on how short or long that game's maze happened
+// to roll. Where those 10 rooms lead changes every match; the rest of the
+// grid is filled in around that fixed-length path as ordinary maze branches.
+const TRUNK_LENGTH = 10;
 
 const WALL_THICKNESS = 8;
 const DOOR_GAP_SIZE = 110;
@@ -34,8 +40,6 @@ const DOOR_FILL_RATE = 100 / 9; // 9s to open for anyone now that all roles can 
 const HACKER_DOOR_MULT = 1.5; // hacker keeps the original 6s pace, everyone else is slower
 const DOOR_RADIUS = 64;
 const PICKUP_RADIUS = 40;
-
-const VAULT_ORIGIN = { x: VAULT_CELL.col * ROOM_SIZE, y: VAULT_CELL.row * ROOM_SIZE };
 
 // Bigger and heavier pieces are worth more — but slow whoever carries them
 // down, unless that's the Fugitivo (who's built for hauling heavy loads).
@@ -116,27 +120,69 @@ function connectionKey(a: Cell, b: Cell) {
   return [cellKey(a), cellKey(b)].sort().join("-");
 }
 
-// Randomized depth-first "recursive backtracker" — the standard algorithm for
-// carving a perfect maze (exactly one path between any two rooms, plenty of
-// dead ends) out of a grid.
-function generateMazeConnections(cols: number, rows: number): Set<string> {
-  const visited = new Set<string>();
-  const connections = new Set<string>();
-  const stack: Cell[] = [{ ...ENTRANCE_CELL }];
-  visited.add(cellKey(stack[0]));
+const DIRS = [
+  { dc: 1, dr: 0 },
+  { dc: -1, dr: 0 },
+  { dc: 0, dr: 1 },
+  { dc: 0, dr: -1 },
+];
 
-  const dirs = [
-    { dc: 1, dr: 0 },
-    { dc: -1, dr: 0 },
-    { dc: 0, dr: 1 },
-    { dc: 0, dr: -1 },
-  ];
+/** A self-avoiding walk of exactly `length` steps from the entrance, chosen
+ * at random each call — this becomes the one guaranteed-length path to the
+ * vault. Backtracks on dead ends so it always finds one when the grid has
+ * room for it (25 cells comfortably fits a 10-step path). */
+function generateTrunkPath(cols: number, rows: number, length: number): Cell[] {
+  const path: Cell[] = [{ ...ENTRANCE_CELL }];
+  const visited = new Set<string>([cellKey(path[0])]);
+
+  function step(): boolean {
+    if (path.length - 1 === length) return true;
+    const current = path[path.length - 1];
+
+    for (const d of shuffled(DIRS)) {
+      const nc = current.col + d.dc;
+      const nr = current.row + d.dr;
+      if (nc < 0 || nc >= cols || nr < 0 || nr >= rows) continue;
+      const next = { col: nc, row: nr };
+      const key = cellKey(next);
+      if (visited.has(key)) continue;
+
+      visited.add(key);
+      path.push(next);
+      if (step()) return true;
+      path.pop();
+      visited.delete(key);
+    }
+
+    return false;
+  }
+
+  if (!step()) throw new Error("could not fit a trunk path of the requested length");
+  return path;
+}
+
+/** Randomized depth-first "recursive backtracker" — the standard algorithm for
+ * carving a perfect maze (exactly one path between any two rooms, plenty of
+ * dead ends) out of a grid. Seeded with the trunk path already "carved" and
+ * marked visited, so the single path it leaves between the entrance and the
+ * trunk's far end is exactly that trunk — everything else branches off of it
+ * (and off those branches) as ordinary dead-end maze. */
+function generateMazeConnections(cols: number, rows: number): { connections: Set<string>; vaultCell: Cell } {
+  const trunk = generateTrunkPath(cols, rows, TRUNK_LENGTH);
+
+  const visited = new Set<string>(trunk.map(cellKey));
+  const connections = new Set<string>();
+  for (let i = 0; i < trunk.length - 1; i++) {
+    connections.add(connectionKey(trunk[i], trunk[i + 1]));
+  }
+
+  const stack: Cell[] = [...trunk];
 
   while (stack.length > 0) {
     const current = stack[stack.length - 1];
     const neighbors: Cell[] = [];
 
-    for (const d of dirs) {
+    for (const d of DIRS) {
       const nc = current.col + d.dc;
       const nr = current.row + d.dr;
       if (nc < 0 || nc >= cols || nr < 0 || nr >= rows) continue;
@@ -155,7 +201,7 @@ function generateMazeConnections(cols: number, rows: number): Set<string> {
     stack.push(next);
   }
 
-  return connections;
+  return { connections, vaultCell: trunk[trunk.length - 1] };
 }
 
 function dist(ax: number, ay: number, bx: number, by: number) {
@@ -250,6 +296,9 @@ export class HeistRoom extends Room<HeistState> {
   private staticWalls: Rect[] = [];
   private statues: { x: number; y: number }[] = [];
   private obraSecrets = new Map<string, ObraSecret>();
+  // Overwritten by setupMaze() before anything else reads it — the default
+  // here only matters if that ever stops being true.
+  private vaultCell: Cell = { col: COLS - 1, row: ROWS - 1 };
 
   onCreate(options: {
     mode?: string;
@@ -295,7 +344,10 @@ export class HeistRoom extends Room<HeistState> {
    * edges get a door, every other shared wall stays solid, so plenty of
    * rooms end up as dead ends. */
   private setupMaze() {
-    const connections = generateMazeConnections(COLS, ROWS);
+    const { connections, vaultCell } = generateMazeConnections(COLS, ROWS);
+    this.vaultCell = vaultCell;
+    this.state.vaultCol = vaultCell.col;
+    this.state.vaultRow = vaultCell.row;
 
     const addSharedWall = (
       orientation: "vertical" | "horizontal",
@@ -398,7 +450,7 @@ export class HeistRoom extends Room<HeistState> {
     for (let col = 0; col < COLS; col++) {
       for (let row = 0; row < ROWS; row++) {
         const isEntrance = col === ENTRANCE_CELL.col && row === ENTRANCE_CELL.row;
-        const isVault = col === VAULT_CELL.col && row === VAULT_CELL.row;
+        const isVault = col === this.vaultCell.col && row === this.vaultCell.row;
         if (!isEntrance && !isVault) rooms.push({ col, row });
       }
     }
@@ -480,6 +532,8 @@ export class HeistRoom extends Room<HeistState> {
     const cellW = ROOM_SIZE / cols;
     const rows = Math.ceil(OBRA_POOL.length / cols);
     const cellH = ROOM_SIZE / (rows + 1);
+    const vaultOriginX = this.vaultCell.col * ROOM_SIZE;
+    const vaultOriginY = this.vaultCell.row * ROOM_SIZE;
 
     const order = shuffled(OBRA_POOL.map((_, i) => i));
     const fakeIndexes = new Set(order.slice(0, fakeCount));
@@ -492,8 +546,8 @@ export class HeistRoom extends Room<HeistState> {
       const obra = new ObraState();
       obra.id = `item${i}`;
       obra.itemType = def.itemType;
-      obra.x = VAULT_ORIGIN.x + cellW * (col + 0.5);
-      obra.y = VAULT_ORIGIN.y + cellH * (row + 1);
+      obra.x = vaultOriginX + cellW * (col + 0.5);
+      obra.y = vaultOriginY + cellH * (row + 1);
       obra.value = def.value;
       obra.weight = def.weight;
       this.state.obras.push(obra);

@@ -19,4 +19,6 @@ export class HeistState extends Schema {
   @type("string") gameStatus: string = "playing"; // playing | won | lost | traitor_won
   @type("string") loseReason: string = ""; // "" | guards | fake | tracker
   @type("string") mode: string = "assalto"; // assalto | traidor
+  @type("number") vaultCol: number = 0;
+  @type("number") vaultRow: number = 0;
 }

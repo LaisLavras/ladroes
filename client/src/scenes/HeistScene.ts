@@ -24,7 +24,9 @@ const BOUNDS = { width: COLS * ROOM_SIZE, height: ROWS * ROOM_SIZE };
 const VIEWPORT = { width: 960, height: 640 };
 
 const ENTRANCE_CELL = { col: 0, row: 0 };
-const VAULT_CELL = { col: COLS - 1, row: ROWS - 1 };
+// The vault's room changes every match now (always exactly 10 rooms from the
+// entrance by the one path that reaches it — see TRUNK_LENGTH server-side) —
+// its actual cell comes from synced state instead of a fixed corner.
 
 const EXIT_ZONE = { x: 24, y: ROOM_SIZE - 150, w: 150, h: 110 };
 
@@ -118,9 +120,14 @@ export class HeistScene extends Phaser.Scene {
   private connectMode: "solo" | "publica" | "privadaCriar" | "privadaEntrar" = "publica";
   private privateCode?: string;
   private room?: Room;
+  // Set once from synced state right after connecting — -1 until then so the
+  // minimap doesn't briefly highlight the wrong room as "vault".
+  private vaultCol = -1;
+  private vaultRow = -1;
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd?: Record<"W" | "A" | "S" | "D", Phaser.Input.Keyboard.Key>;
   private keyE?: Phaser.Input.Keyboard.Key;
+  private keySpace?: Phaser.Input.Keyboard.Key;
   private keyShift?: Phaser.Input.Keyboard.Key;
   private keyF?: Phaser.Input.Keyboard.Key;
   private keyR?: Phaser.Input.Keyboard.Key;
@@ -161,6 +168,8 @@ export class HeistScene extends Phaser.Scene {
     this.trackerCount = data?.trackerCount ?? 1;
     this.connectMode = data?.connectMode ?? "publica";
     this.privateCode = data?.privateCode;
+    this.vaultCol = -1;
+    this.vaultRow = -1;
 
     // Phaser reuses this Scene instance across restarts (init/create run
     // again, but the constructor doesn't) — without clearing these here, a
@@ -400,6 +409,7 @@ export class HeistScene extends Phaser.Scene {
     this.cursors = this.input.keyboard?.createCursorKeys();
     this.wasd = this.input.keyboard?.addKeys("W,A,S,D") as typeof this.wasd;
     this.keyE = this.input.keyboard?.addKey("E");
+    this.keySpace = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     this.keyShift = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
     this.keyF = this.input.keyboard?.addKey("F");
     this.keyR = this.input.keyboard?.addKey("R");
@@ -422,9 +432,13 @@ export class HeistScene extends Phaser.Scene {
         color: "#49c2b1",
       })
       .setDepth(3);
+  }
 
+  /** The vault's room is randomized per match, so its "COFRE" label can only
+   * be placed once the synced state tells us where it landed. */
+  private drawVaultLabel(col: number, row: number) {
     this.add
-      .text(VAULT_CELL.col * ROOM_SIZE + ROOM_SIZE - 12, VAULT_CELL.row * ROOM_SIZE + 10, "COFRE", {
+      .text(col * ROOM_SIZE + ROOM_SIZE - 12, row * ROOM_SIZE + 10, "COFRE", {
         fontFamily: "monospace",
         fontSize: "12px",
         color: "#49c2b1",
@@ -474,8 +488,13 @@ export class HeistScene extends Phaser.Scene {
       }
 
       this.statusText?.setText(`Conectado — sala ${this.room.roomId}`);
-      this.showToast("💡 Segure E perto de uma porta trancada para abrir", 6000);
+      this.showToast("💡 Segure E, ESPAÇO ou o clique do mouse perto de uma porta trancada para abrir", 6000);
       startSuspenseMusic();
+
+      const roomState = this.room.state as any;
+      this.vaultCol = clamp(Number(roomState.vaultCol) || 0, 0, COLS - 1);
+      this.vaultRow = clamp(Number(roomState.vaultRow) || 0, 0, ROWS - 1);
+      this.drawVaultLabel(this.vaultCol, this.vaultRow);
 
       if (this.connectMode === "privadaCriar") {
         this.privateCodeText?.setText(`CÓDIGO DA SALA: ${this.room.roomId}\npasse esse código para seus amigos`).setVisible(true);
@@ -616,7 +635,7 @@ export class HeistScene extends Phaser.Scene {
       y /= len;
     }
 
-    const interact = !!this.keyE?.isDown;
+    const interact = !!(this.keyE?.isDown || this.keySpace?.isDown || this.input.activePointer.isDown);
     const ability = !!(this.keyShift?.isDown || this.keyF?.isDown);
     const secondary = !!this.keyR?.isDown;
 
@@ -657,7 +676,7 @@ export class HeistScene extends Phaser.Scene {
         const cy = MINI_Y + MINI_PAD + r * (MINI_CELL + MINI_GAP);
 
         const isEntrance = c === ENTRANCE_CELL.col && r === ENTRANCE_CELL.row;
-        const isVault = c === VAULT_CELL.col && r === VAULT_CELL.row;
+        const isVault = c === this.vaultCol && r === this.vaultRow;
         const isHere = c === col && r === row;
 
         const fill = isVault ? 0xf2c14e : isEntrance ? 0x49c2b1 : 0x5b6773;
@@ -687,7 +706,10 @@ export class HeistScene extends Phaser.Scene {
 
     const g = this.fogGfx;
     g.clear();
-    g.fillStyle(0x05070a, 0.97);
+    // Fully opaque — even a couple percent of see-through here was enough to
+    // make a guard's silhouette or flashlight cone show faintly through the
+    // fog in the room next door, which defeats the point of the fog.
+    g.fillStyle(0x05070a, 1);
     g.fillRect(0, 0, BOUNDS.width, y0); // above the room
     g.fillRect(0, y1, BOUNDS.width, BOUNDS.height - y1); // below the room
     g.fillRect(0, y0, x0, ROOM_SIZE); // left of the room
