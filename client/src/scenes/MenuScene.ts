@@ -12,7 +12,6 @@ function clamp(v: number, min: number, max: number) {
 const MODES = [
   { id: "assalto", name: "Assalto", desc: "Cooperativo — 4 papéis contra os guardas" },
   { id: "traidor", name: "Traidor", desc: "1 dos 4 jogadores pode trair o grupo em segredo" },
-  { id: "seguranca", name: "Ladrões vs Segurança", desc: "Um jogador controla o chefe, os outros roubam" },
 ];
 
 const PLAYER_MODES = [
@@ -55,7 +54,9 @@ export class MenuScene extends Phaser.Scene {
 
   create() {
     this.profile = loadProfile();
-    this.selectedMode = this.profile.lastMode;
+    // Guards against a leftover selection from a mode that no longer exists
+    // (e.g. localStorage still has "seguranca" from before it was removed).
+    this.selectedMode = MODES.some((m) => m.id === this.profile.lastMode) ? this.profile.lastMode : "assalto";
     this.cameras.main.setBackgroundColor(0x0b0f14);
     setMusicEnabled(this.profile.musicEnabled);
     setSfxEnabled(this.profile.sfxEnabled);

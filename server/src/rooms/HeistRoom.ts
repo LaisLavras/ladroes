@@ -13,11 +13,6 @@ const BASE_SPEED = 220; // px/s
 const FUGITIVO_SPEED_MULT = 1.4;
 const PLAYER_R = 16;
 
-const CHIEF_SPEED = 250; // px/s — faster than a regular thief, but not as fast as a sprinting fugitivo
-const CAPTURE_RADIUS = 42;
-const CAPTURE_ALARM_BOOST = 40;
-const CAPTURE_COOLDOWN_MS = 3000;
-
 const TRAITOR_SABOTAGE_ALARM_RATE = 3; // per second, while closing a door — a little noise "calling guards"
 
 // The museum is a grid of rooms with exactly one correct path carved through
@@ -241,10 +236,10 @@ interface ObraSecret {
 export class HeistRoom extends Room<HeistState> {
   maxClients = 4;
 
-  private mode: "assalto" | "traidor" | "seguranca" = "assalto";
+  private mode: "assalto" | "traidor" = "assalto";
   private traitorSessionId: string | null = null;
   // Decided once, before anyone joins: which join position (1-indexed)
-  // secretly becomes the traitor/chief. This makes it a real lottery instead
+  // secretly becomes the traitor. This makes it a real lottery instead
   // of always picking whoever happens to connect first.
   private specialSlot = 1;
 
@@ -266,11 +261,11 @@ export class HeistRoom extends Room<HeistState> {
     this.setState(new HeistState());
     this.state.startedAt = Date.now();
 
-    if (options?.mode === "traidor" || options?.mode === "seguranca") {
+    if (options?.mode === "traidor") {
       this.mode = options.mode;
     }
     this.state.mode = this.mode;
-    this.maxClients = this.mode === "seguranca" ? 5 : 4;
+    this.maxClients = 4;
     // Solo play has to actually be capped at 1 seat — without this, "Sozinho"
     // just joined the same public matchmaking pool as everyone else and any
     // stranger could land in what looked like a private run.
@@ -279,9 +274,7 @@ export class HeistRoom extends Room<HeistState> {
     this.specialSlot = 1 + Math.floor(Math.random() * this.maxClients);
 
     this.setupMaze();
-    // The security chief in "seguranca" mode IS the threat — no automated
-    // guards on top of a player actively hunting the thieves.
-    if (this.mode !== "seguranca") this.setupGuards();
+    this.setupGuards();
     this.setupStatues();
     this.setupObras(options?.fakeCount, options?.trackerCount);
 
@@ -515,13 +508,8 @@ export class HeistRoom extends Room<HeistState> {
   onJoin(client: Client, options: { loadout?: string[]; name?: string }) {
     const joinIndex = this.state.players.size + 1;
 
-    let role: string;
-    if (this.mode === "seguranca" && joinIndex === this.specialSlot) {
-      role = "chefe";
-    } else {
-      const takenRoles = new Set([...this.state.players.values()].map((p) => p.role));
-      role = ROLES.find((r) => !takenRoles.has(r)) ?? "espectador";
-    }
+    const takenRoles = new Set([...this.state.players.values()].map((p) => p.role));
+    const role = ROLES.find((r) => !takenRoles.has(r)) ?? "espectador";
 
     const player = new PlayerState();
     const trimmedName = typeof options?.name === "string" ? options.name.trim().slice(0, 20) : "";
@@ -608,7 +596,6 @@ export class HeistRoom extends Room<HeistState> {
 
       let speed = BASE_SPEED;
       if (player.role === "fugitivo") speed *= FUGITIVO_SPEED_MULT;
-      else if (player.role === "chefe") speed = CHIEF_SPEED;
       if (player.hasFolego) speed *= 1.1;
 
       // Heavy loot slows you down — unless you're the Fugitivo, built for it.
@@ -619,14 +606,11 @@ export class HeistRoom extends Room<HeistState> {
         }
       }
 
-      // The security chief has building access — closed doors don't stop them.
-      const ignoreDoors = player.role === "chefe";
-
       const nx = clamp(player.x + input.x * speed * dt, PLAYER_R, BOUNDS.width - PLAYER_R);
       const ny = clamp(player.y + input.y * speed * dt, PLAYER_R, BOUNDS.height - PLAYER_R);
 
-      if (!this.isBlocked(nx, player.y, ignoreDoors)) player.x = nx;
-      if (!this.isBlocked(player.x, ny, ignoreDoors)) player.y = ny;
+      if (!this.isBlocked(nx, player.y)) player.x = nx;
+      if (!this.isBlocked(player.x, ny)) player.y = ny;
 
       // Anyone can hold interact near a closed door to open it — the hacker
       // just does it faster, and faster still with the hacker kit equipped.
@@ -684,12 +668,6 @@ export class HeistRoom extends Room<HeistState> {
         } else if (player.role === "engenheiro") {
           this.guardsDisabledUntil = now + ENGINEER_EMP_MS;
           player.abilityCooldownUntil = now + ENGINEER_COOLDOWN_MS;
-        } else if (player.role === "chefe") {
-          const target = this.findCapturablePlayer(sessionId, player.x, player.y);
-          if (target) {
-            this.state.alarm = Math.min(100, this.state.alarm + CAPTURE_ALARM_BOOST);
-            player.abilityCooldownUntil = now + CAPTURE_COOLDOWN_MS;
-          }
         }
       }
     }
@@ -766,18 +744,6 @@ export class HeistRoom extends Room<HeistState> {
         await addScore({ name: player.name, timeMs, mode: this.mode, date });
       }
     })().catch((err) => console.error("[HeistRoom] failed to record completion:", err));
-  }
-
-  /** Nearest non-invisible, non-hidden thief within capture range of the chief. */
-  private findCapturablePlayer(chiefSessionId: string, chiefX: number, chiefY: number): string | null {
-    for (const [sessionId, player] of this.state.players.entries()) {
-      if (sessionId === chiefSessionId || player.role === "chefe") continue;
-      if (player.invisible) continue;
-      if (dist(chiefX, chiefY, player.x, player.y) >= CAPTURE_RADIUS) continue;
-      if (this.isHiddenBehindStatue(chiefX, chiefY, player.x, player.y)) continue;
-      return sessionId;
-    }
-    return null;
   }
 
   private updateGuards(dt: number, now: number, sabotageActive: boolean) {

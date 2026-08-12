@@ -60,7 +60,6 @@ const ROLE_COLOR: Record<string, number> = {
   fantasma: 0x8b7cf6,
   fugitivo: 0xf2a641,
   engenheiro: 0xe5484d,
-  chefe: 0xe5484d,
   espectador: 0x5b6773,
 };
 
@@ -69,7 +68,6 @@ const ROLE_LABEL: Record<string, string> = {
   fantasma: "Fantasma",
   fugitivo: "Fugitivo",
   engenheiro: "Engenheiro",
-  chefe: "Chefe de Segurança",
   espectador: "Espectador",
 };
 
@@ -81,7 +79,6 @@ const ROLE_HINT: Record<string, string> = {
   fantasma: "SHIFT — invisibilidade (5s, recarga 30s)",
   fugitivo: "passivo — corre mais rápido que os outros",
   engenheiro: "F — EMP desliga os guardas por 10s (recarga 45s)",
-  chefe: "Atravessa portas fechadas — SHIFT perto de um ladrão para capturar (recarga 3s)",
   espectador: "",
 };
 
@@ -528,7 +525,7 @@ export class HeistScene extends Phaser.Scene {
           .ellipse(player.x, player.y + 13, isSelf ? 22 : 18, 9, ringColor, ringAlpha)
           .setDepth(6.8);
 
-        const sprite = createPersonContainer(this, color, { masked: player.role !== "chefe" })
+        const sprite = createPersonContainer(this, color, { masked: true })
           .setPosition(player.x, player.y)
           .setDepth(7)
           .setScale(isSelf ? 1.6 : 1.4);
@@ -806,11 +803,11 @@ export class HeistScene extends Phaser.Scene {
       this.timerText?.setText(`⏱ ${formatTime(Date.now() - state.startedAt)}`);
     }
 
-    // Fantasma/Engenheiro/Chefe all have a timed ability — this counts down
+    // Fantasma/Engenheiro both have a timed ability — this counts down
     // to when it's usable again instead of leaving it a guessing game.
     const me = state.players?.get(this.room.sessionId);
     const remainingMs = me ? me.abilityCooldownUntil - Date.now() : 0;
-    if (me && ["fantasma", "engenheiro", "chefe"].includes(me.role) && remainingMs > 0) {
+    if (me && ["fantasma", "engenheiro"].includes(me.role) && remainingMs > 0) {
       this.abilityCooldownText?.setText(`🕐 Habilidade em ${Math.ceil(remainingMs / 1000)}s`).setVisible(true);
     } else {
       this.abilityCooldownText?.setVisible(false);
@@ -837,7 +834,7 @@ export class HeistScene extends Phaser.Scene {
       this.restartBtn?.setVisible(true);
       this.backToShopBtn?.setVisible(true);
     } else if (state.gameStatus === "lost") {
-      let text = this.mode === "seguranca" ? "SEGURANÇA VENCEU" : "POLÍCIA CHEGOU";
+      let text = "POLÍCIA CHEGOU";
       if (state.loseReason === "fake") text = "SE FUDEU, ITEM FALSIFICADO, NA PRÓXIMA ESCOLHA MELHOR!";
       else if (state.loseReason === "tracker") text = "SE FUDEU, OBJETO COM RASTREADOR";
       this.bannerText?.setText(text).setColor("#e5484d").setVisible(true);

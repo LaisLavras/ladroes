@@ -13,7 +13,6 @@ interface LeaderboardEntry {
 const MODES = [
   { id: "assalto", name: "Assalto" },
   { id: "traidor", name: "Traidor" },
-  { id: "seguranca", name: "Ladrões vs Segurança" },
 ];
 
 function formatTime(ms: number) {
@@ -58,7 +57,7 @@ export class LeaderboardScene extends Phaser.Scene {
     backBtn.on("pointerout", () => backBtn.setColor("#8793a1"));
     backBtn.on("pointerdown", () => this.scene.start("menu"));
 
-    MODES.forEach((mode, i) => this.renderModeCard(WIDTH / 2 - 330 + i * 220, 90, mode));
+    MODES.forEach((mode, i) => this.renderModeCard(WIDTH / 2 - 110 + i * 220, 90, mode));
 
     this.statusText = this.add
       .text(WIDTH / 2, 140, "Carregando...", {
