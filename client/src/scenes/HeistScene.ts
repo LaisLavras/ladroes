@@ -424,14 +424,6 @@ export class HeistScene extends Phaser.Scene {
     for (let y = 0; y <= BOUNDS.height; y += 32) g.lineBetween(0, y, BOUNDS.width, y);
     g.lineStyle(2, 0xf2a641, 1);
     g.strokeRect(1, 1, BOUNDS.width - 2, BOUNDS.height - 2);
-
-    this.add
-      .text(ENTRANCE_CELL.col * ROOM_SIZE + 12, ENTRANCE_CELL.row * ROOM_SIZE + 10, "ENTRADA", {
-        fontFamily: "monospace",
-        fontSize: "12px",
-        color: "#49c2b1",
-      })
-      .setDepth(3);
   }
 
   /** The vault's room is randomized per match, so its "COFRE" label can only
@@ -488,7 +480,10 @@ export class HeistScene extends Phaser.Scene {
       }
 
       this.statusText?.setText(`Conectado — sala ${this.room.roomId}`);
-      this.showToast("💡 Segure E, ESPAÇO ou o clique do mouse perto de uma porta trancada para abrir", 6000);
+      this.showToast(
+        "🎯 Vá até o cofre, roube algum item e depois volte até a saída\n💡 Segure E, ESPAÇO ou o clique do mouse perto de uma porta trancada para abrir",
+        8000
+      );
       startSuspenseMusic();
 
       const roomState = this.room.state as any;

@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { TitleScene } from "./scenes/TitleScene";
 import { MenuScene } from "./scenes/MenuScene";
 import { HeistScene } from "./scenes/HeistScene";
 import { LeaderboardScene } from "./scenes/LeaderboardScene";
@@ -18,5 +19,5 @@ new Phaser.Game({
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  scene: [MenuScene, HeistScene, LeaderboardScene],
+  scene: [TitleScene, MenuScene, HeistScene, LeaderboardScene],
 });
