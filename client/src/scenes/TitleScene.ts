@@ -5,20 +5,18 @@ import { createObraIcon } from "../obraIcons";
 const WIDTH = 960;
 const HEIGHT = 640;
 
-// Loot scattered around the two thieves — a mix of item types/weights so the
-// pile reads as varied treasure instead of copies of the same icon.
-const LOOT: { itemType: string; weight: number; x: number; y: number; scale: number }[] = [
-  { itemType: "coroa", weight: 2, x: 480, y: 472, scale: 2.6 },
-  { itemType: "moeda", weight: 1, x: 392, y: 505, scale: 2.2 },
-  { itemType: "moeda", weight: 1, x: 568, y: 503, scale: 2 },
-  { itemType: "colar", weight: 1, x: 430, y: 450, scale: 2.4 },
-  { itemType: "dinheiro", weight: 2, x: 550, y: 454, scale: 2.4 },
-  { itemType: "escultura", weight: 3, x: 312, y: 460, scale: 1.8 },
-  { itemType: "vaso", weight: 2, x: 648, y: 464, scale: 2 },
+const THIEVES = [
+  { x: 400, color: 0x49c2b1, bagX: 305 },
+  { x: 560, color: 0xf2a641, bagX: 655 },
 ];
+const THIEF_Y = 380;
+const THIEF_SCALE = 8;
+const BAG_Y = 415;
+const BAG_SCALE = 2.6;
 
-/** The very first thing a player sees — a title card with the two thieves and
- * their loot, before getting into the mode/loadout picking in MenuScene. */
+/** The very first thing a player sees — a title card with the two thieves,
+ * each clutching a sack of loot, before getting into the mode/loadout
+ * picking in MenuScene. */
 export class TitleScene extends Phaser.Scene {
   constructor() {
     super("title");
@@ -41,20 +39,18 @@ export class TitleScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.add
-      .text(WIDTH / 2, 150, "um roubo cooperativo em pixel art", {
+      .text(WIDTH / 2, 150, "Entre e saia sem ser notado — seu faro é aguçado o\nsuficiente pra não ser pego?!", {
         fontFamily: "monospace",
         fontSize: "14px",
         color: "#8793a1",
+        align: "center",
       })
       .setOrigin(0.5);
 
-    // Loot pile first (behind), thieves on top of it.
-    LOOT.forEach((item) => {
-      createObraIcon(this, item.itemType, item.weight).setPosition(item.x, item.y).setScale(item.scale).setDepth(1);
+    THIEVES.forEach((t) => {
+      createPersonContainer(this, t.color, { masked: true }).setPosition(t.x, THIEF_Y).setScale(THIEF_SCALE).setDepth(2);
+      createObraIcon(this, "dinheiro", 2).setPosition(t.bagX, BAG_Y).setScale(BAG_SCALE).setDepth(2);
     });
-
-    createPersonContainer(this, 0x49c2b1, { masked: true }).setPosition(400, 320).setScale(7).setDepth(2);
-    createPersonContainer(this, 0xf2a641, { masked: true }).setPosition(560, 320).setScale(7).setDepth(2);
 
     const playBtn = this.add
       .rectangle(WIDTH / 2, HEIGHT - 70, 260, 56, 0x49c2b1)

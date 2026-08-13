@@ -5,7 +5,7 @@ import Phaser from "phaser";
 // createCanvas() throws in this environment). Rows 1-3 have two variants: a
 // robber's mask with eye-holes for thieves, or a plain face for guards.
 const BASE_ROWS = [
-  "..hhhh....",
+  ".hhhhhh...",
   null, // row 1 — swapped in below
   null, // row 2 — swapped in below
   null, // row 3 — swapped in below
@@ -21,10 +21,9 @@ const BASE_ROWS = [
   "..dd..dd..",
 ];
 const PLAIN_ROWS = [".hSSSSSh..", ".hSeSSeSh.", ".hSSSSSh.."];
-// Three rows tall (not just one) and wider than the face rows above/below —
-// so it reads as a bandit's bandana overhanging the temples at normal sprite
-// scale, without needing to zoom in to tell it apart from a plain face.
-const MASKED_ROWS = ["MMMMMMMMMM", "MMMeMMeMMM", "MMMMMMMMMM"];
+// Three rows tall (not just one) — reads as a bandit's bandana at normal
+// sprite scale, without needing to zoom in to tell it apart from a plain face.
+const MASKED_ROWS = [".MMMMMMMM.", ".MMeMMeMM.", ".MMMMMMMM."];
 const PX = 2;
 
 const PIXEL_COLORS: Record<string, number> = {

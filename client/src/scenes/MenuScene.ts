@@ -105,6 +105,20 @@ export class MenuScene extends Phaser.Scene {
     rankingBtn.on("pointerout", () => rankingBtn.setColor("#8793a1"));
     rankingBtn.on("pointerdown", () => this.scene.start("leaderboard"));
 
+    const backBtn = this.add
+      .text(WIDTH - 16, 32, "◂ INÍCIO", {
+        fontFamily: "monospace",
+        fontSize: "12px",
+        color: "#8793a1",
+        backgroundColor: "#121822",
+        padding: { x: 8, y: 4 },
+      })
+      .setOrigin(1, 0)
+      .setInteractive({ useHandCursor: true });
+    backBtn.on("pointerover", () => backBtn.setColor("#f2a641"));
+    backBtn.on("pointerout", () => backBtn.setColor("#8793a1"));
+    backBtn.on("pointerdown", () => this.scene.start("title"));
+
     this.musicToggle = this.add
       .text(16, 32, "", {
         fontFamily: "monospace",

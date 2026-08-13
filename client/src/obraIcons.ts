@@ -7,11 +7,21 @@ export function createObraIcon(scene: Phaser.Scene, itemType: string, weight: nu
 
   switch (itemType) {
     case "dinheiro": {
-      container.add(scene.add.ellipse(0, 2, 20 * scale, 16 * scale, 0x2f8f4e));
-      container.add(scene.add.ellipse(0, 2, 20 * scale, 16 * scale, 0x000000, 0).setStrokeStyle(2, 0x1c2733));
-      container.add(scene.add.rectangle(0, -8 * scale, 8 * scale, 6 * scale, 0x2f8f4e).setStrokeStyle(1, 0x1c2733));
+      // Stepped rows of blocks (not a smooth ellipse) so the sack reads as
+      // pixel art like everything else, instead of standing out as the one
+      // rounded shape in the set.
+      const px = 3 * scale;
+      const bagColor = 0x2f8f4e;
+      const outline = 0x1c2733;
+      const rowWidths = [3, 6, 7, 8, 8, 7, 5]; // in px units, top to bottom
+      const totalH = rowWidths.length * px;
+      rowWidths.forEach((w, i) => {
+        const y = i * px - totalH / 2 + px / 2 + px;
+        container.add(scene.add.rectangle(0, y, w * px, px, bagColor).setStrokeStyle(1, outline));
+      });
+      container.add(scene.add.rectangle(0, -totalH / 2 - px / 2 + px, 2 * px, px, outline));
       container.add(
-        scene.add.text(0, 2, "$", { fontFamily: "monospace", fontSize: `${12 * scale}px`, color: "#f2e94e" }).setOrigin(0.5)
+        scene.add.text(0, 4 * scale, "$", { fontFamily: "monospace", fontSize: `${11 * scale}px`, color: "#f2e94e" }).setOrigin(0.5)
       );
       break;
     }
