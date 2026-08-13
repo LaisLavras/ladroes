@@ -633,6 +633,8 @@ export class HeistRoom extends Room<HeistState> {
     if (this.state.gameStatus !== "playing") return;
 
     const now = Date.now();
+    this.state.elapsedMs = now - this.state.startedAt;
+
     // Opening a door takes continuous effort — a door that isn't actively
     // being filled by a hacker this tick snaps its progress back to 0, so
     // letting go of the button always means starting over from scratch.

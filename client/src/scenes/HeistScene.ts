@@ -74,10 +74,10 @@ const ROLE_LABEL: Record<string, string> = {
 };
 
 const ROLE_HINT: Record<string, string> = {
-  // Everyone can hold E to open a door now (covered by the 💡 toast on
-  // connect) — the hacker's own line only needs to call out what's actually
-  // unique to the role, so it doesn't just repeat that tip.
-  hacker: "abre portas bem mais rápido que os outros",
+  // Hacker has nothing here — it's a passive role with no key of its own, so
+  // pinning a permanent line on screen for it just added clutter with
+  // nothing actionable in it.
+  hacker: "",
   fantasma: "SHIFT — invisibilidade (5s, recarga 30s)",
   fugitivo: "passivo — corre mais rápido que os outros",
   engenheiro: "F — EMP desliga os guardas por 10s (recarga 45s)",
@@ -182,6 +182,13 @@ export class HeistScene extends Phaser.Scene {
   }
 
   create() {
+    // Phaser reuses this Scene instance on restart, but a scene shutdown
+    // never destroys its Game Objects on its own — without this, every
+    // restart piled a fresh floor/HUD/banner on top of the previous run's,
+    // leaving stuff like the old "ROUBO CONCLUÍDO" banner stuck on screen
+    // forever after.
+    this.children.removeAll(true);
+
     // The scene instance is reused on restart, so the previous run's drone
     // would otherwise keep playing under the new one — stop it whenever this
     // scene goes away, whichever button triggered that.
@@ -816,8 +823,12 @@ export class HeistScene extends Phaser.Scene {
 
     // Keeps ticking only while the run is live — freezes on the final split
     // the instant it ends, instead of drifting past the actual finish time.
-    if (state.gameStatus === "playing" && typeof state.startedAt === "number" && state.startedAt > 0) {
-      this.timerText?.setText(`⏱ ${formatTime(Date.now() - state.startedAt)}`);
+    // elapsedMs comes pre-computed from the server (both readings off its own
+    // clock) — computing Date.now() - state.startedAt here instead used to
+    // compare the client's own clock against the server's, which went
+    // negative whenever the two machines' clocks weren't in perfect sync.
+    if (state.gameStatus === "playing") {
+      this.timerText?.setText(`⏱ ${formatTime(Math.max(0, state.elapsedMs ?? 0))}`);
     }
 
     // Fantasma/Engenheiro both have a timed ability — this counts down

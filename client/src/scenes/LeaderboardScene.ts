@@ -33,6 +33,10 @@ export class LeaderboardScene extends Phaser.Scene {
   }
 
   create() {
+    // A scene shutdown never destroys its Game Objects on its own — without
+    // this, coming back to the ranking screen piled a fresh copy on top of
+    // whatever was already sitting here from before.
+    this.children.removeAll(true);
     this.cameras.main.setBackgroundColor(0x0b0f14);
     this.modeCards = [];
 

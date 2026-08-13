@@ -23,6 +23,10 @@ export class TitleScene extends Phaser.Scene {
   }
 
   create() {
+    // A scene shutdown never destroys its Game Objects on its own — without
+    // this, coming back here (e.g. the menu's "◂ INÍCIO" button) piled a
+    // fresh copy of the title card on top of whatever was already here.
+    this.children.removeAll(true);
     this.cameras.main.setBackgroundColor(0x0b0f14);
 
     const g = this.add.graphics();

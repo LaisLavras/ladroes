@@ -16,6 +16,11 @@ export class HeistState extends Schema {
 
   @type("number") alarm: number = 0;
   @type("number") startedAt: number = 0;
+  // Elapsed time computed server-side (both readings off the same clock) —
+  // the client used to do Date.now() - startedAt itself, comparing its own
+  // clock against the server's, which went negative whenever the two
+  // machines' clocks weren't in perfect sync.
+  @type("number") elapsedMs: number = 0;
   @type("string") gameStatus: string = "playing"; // playing | won | lost | traitor_won
   @type("string") loseReason: string = ""; // "" | guards | fake | tracker
   @type("string") mode: string = "assalto"; // assalto | traidor

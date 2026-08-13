@@ -53,6 +53,15 @@ export class MenuScene extends Phaser.Scene {
   }
 
   create() {
+    // A scene shutdown never destroys its Game Objects on its own — without
+    // this, coming back here (from the heist screen, or the title screen)
+    // piled a fresh copy of the whole menu on top of whatever was already
+    // sitting here from before.
+    this.children.removeAll(true);
+    this.modeCards = [];
+    this.playerModeCards = [];
+    this.itemCards = [];
+
     this.profile = loadProfile();
     // Guards against a leftover selection from a mode that no longer exists
     // (e.g. localStorage still has "seguranca" from before it was removed).
